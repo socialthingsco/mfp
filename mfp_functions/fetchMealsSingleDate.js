@@ -3,10 +3,11 @@
 var request = require('request');
 var cheerio = require('cheerio');
 var helpers = require('./helper-utils');
+var processItems = require('./processMeal').processItems;
 
 
 //some notes: we use the printable diary for most checks, but not water, which can't be fetched here.
-var fetchSingleDate = function(username, date, fields, callback){
+var fetchMealsSingleDate = function(username, date, fields, callback){
   //get MyFitnessPal URL (eg. 'https://www.myfitnesspal.com/reports/printable_diary/npmmfp?from=2014-09-13&to=2014-09-13')
   var url = helpers.mfpUrl(username, date, date);
 
@@ -39,6 +40,16 @@ var fetchSingleDate = function(username, date, fields, callback){
 
     //find row in MFP with nutrient totals
     var $dataRow = $('tfoot').find('tr');
+    let items = [];
+    const allRows = $('tbody').find('tr').find('td');
+    $('tbody').find('tr').find('td').each(i => {
+        if (allRows[i].children) { 
+          items.push(allRows[i].children[0]) 
+        }
+    });
+
+    const meals = processItems(items);
+    results.meals = meals;
 
     //store data for each field in results
     for (var field in cols) {
@@ -63,31 +74,8 @@ var fetchSingleDate = function(username, date, fields, callback){
     
     //add date to results object
     results.date = date;
-     
-    //check to see if water is included
-    if (fields == 'all' || fields.includes('water')) {
-      var url = helpers.mfpWaterUrl(username, date);
-      var options = {
-        url: url,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36'
-        }
-      };
-    
-      request(options, function(error, response, body) {
-        if (error) throw error;
-    
-        var $ = cheerio.load(body);
-        results['water'] = helpers.convertToNum($('.water-counter p').text());
-        callback(results);
-      });
-    } else {
-  
-      
-  
-      callback(results);
-    }
+    callback(results);
   });
 };
 
-module.exports = fetchSingleDate;
+module.exports = fetchMealsSingleDate;
